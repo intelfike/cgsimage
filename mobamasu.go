@@ -29,7 +29,7 @@ func getHTML() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// trim
+	// 必要の要素を削除
 	doc.Find(`
 		#extended, 
 		#category, 
@@ -42,19 +42,20 @@ func getHTML() string {
 		.google-2ad-m,
 		.titleRssBottom
 	`).Remove()
-	// left shift
+	// 全体を左寄せ
 	doc.Find("#main").SetAttr("style", "float:left;")
 
-	cmArea := doc.Find(".cmArea")
-	cmArea.Each(func(i int, s *goquery.Selection) {
+	// 画像を挿入するための要素
+	doc.Find(".wrapper").AppendHtml(`<div class="cgs-images" style="display:flex; flex-wrap:wrap; clear:both;"><div>`)
+
+	// 各コメントを編集
+	doc.Find(".cmArea").Each(func(_ int, s *goquery.Selection) {
 		comment := s.Text()
-		numreper := strings.NewReplacer("０", "0", "１", "1", "２", "2", "３", "3", "４", "4", "５", "5", "６", "6", "７", "7", "８", "8", "９", "9", "ー", "-")
-		comment = numreper.Replace(comment)
+		comment = strings.NewReplacer("０", "0", "１", "1", "２", "2", "３", "3", "４", "4", "５", "5", "６", "6", "７", "7", "８", "8", "９", "9", "－", "-").Replace(comment)
 		numlist := numreg.FindAllString(comment, -1)
-		// replist := make([]string, len(numlist)<<1)
-		s.Parent().AppendHtml(`<div class="cgs-images" style="display:flex; flex-wrap:wrap; clear:both;"><div>`)
 		for _, v := range numlist {
 			i, err := strconv.Atoi(v)
+			// 118-2、146-2などの特例を考慮して計算
 			if i > 146 {
 				i++
 			}
@@ -66,29 +67,27 @@ func getHTML() string {
 				case "118-2":
 					i = 119
 				case "146-2":
-					i = 147
+					i = 148
 				default:
-					i = 0
+					i = 200
 				}
+				fmt.Println(v)
 			}
 
+			// 画像生成
 			top, left := calRect(i)
 			tmp := imgTemplate
 			tmp = strings.Replace(tmp, "toppx", strconv.Itoa(top)+"px", 1)
 			tmp = strings.Replace(tmp, "leftpx", strconv.Itoa(left)+"px", 1)
-
+			// 画像追加
 			s.Parent().Find(".cgs-images").AppendHtml(tmp)
-			// replist[n<<1] = v
-			// replist[n<<1+1] = v + tmp
 		}
-
-		// reper := strings.NewReplacer(replist...)
-		// s.SetHtml(reper.Replace(comment))
 	})
 	html, _ := doc.Html()
 	return html
 }
 
+// 座標計算
 func calRect(i int) (top, left int) {
 	i--
 	top = 90 * (i / 16)
@@ -96,13 +95,7 @@ func calRect(i int) (top, left int) {
 	return
 }
 
-// var imgTemplate = `
-// <img src="http://livedoor.blogimg.jp/sr_cobra/imgs/4/8/48b6cab9.jpg" style="
-// 	position:absolute;
-// 	clip: rect(toppx rightpx bottompx leftpx);
-// ">
-//  `
-
+// 画像用のテンプレート
 var imgTemplate = `
 <div style="
 	position: relative;
